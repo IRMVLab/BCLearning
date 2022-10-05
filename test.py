@@ -1,0 +1,151 @@
+import torch
+from kuka import KukaCamEnv1, KukaCamEnv2, KukaCamEnv3
+from agent import base1, base2, base3, np_to_tensor, opt_cuda, base2_ensemble
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+import time
+
+
+def test_critic(task, log, base_ratio=1.0, label='', render=False, n_episodes=1, mode='de', use_fast=True, mean=True):
+    log_dir = 'saves/t' + str(task) + label + '/' + str(log)
+    with open(log_dir + '/critic.pt', 'rb') as fc:
+        critic = torch.load(fc, map_location=torch.device('cpu'))
+    with open(log_dir + '/actor.pt', 'rb') as fa:
+        actor = torch.load(fa, map_location=torch.device('cpu'))
+    if task == 1:
+        env = KukaCamEnv1(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base1
+    elif task == 2:
+        env = KukaCamEnv2(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base2
+    else:
+        env = KukaCamEnv3(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base3
+    for n in range(n_episodes):
+        o, s = env.reset()
+        frame = 0
+        R = 0
+        q_a_record = []
+        q_b_record = []
+        while True:
+            a = base(s)
+            if not use_fast:
+                o_t = torch.tensor(o).type(torch.FloatTensor).unsqueeze(dim=0)
+                s_t = torch.tensor(s[:8]).type(torch.FloatTensor).unsqueeze(dim=0)
+            s = torch.tensor(s).type(torch.FloatTensor).unsqueeze(dim=0)
+            with torch.no_grad():
+                if not use_fast:
+                    action = actor(o_t, s_t, mean=mean)
+                else:
+                    action = actor(s, mean=mean)
+                q_a_record.append(critic(s, action).item())
+                q_b_record.append(critic(s, torch.tensor(a).type(torch.FloatTensor).unsqueeze(dim=0)))
+                action = action.squeeze().numpy()
+                print(action)
+            if np.random.uniform(0, 1) < base_ratio:
+                o_next, s_next, r, done = env.step(a)
+            else:
+                o_next, s_next, r, done = env.step(action)
+            s = s_next
+            o = o_next
+            R += r
+            frame += 1
+            if done or frame >= 100:
+                print('episode', n + 1, 'ends in', frame, 'frames, return =', R)
+                plt.plot(q_a_record, label='agent')
+                plt.plot(q_b_record, c='gray', alpha=0.5, label='base')
+                plt.legend()
+                plt.show()
+                break
+
+
+def test_actor(task, log, n_episodes=100, label='', base_ratio=1.0, render=False, mode='de', use_fast=True):
+    with open('saves/t' + str(task) + label + '/' + str(log) + '/actor.pt', 'rb') as fa:
+        actor = opt_cuda(torch.load(fa, map_location=torch.device('cpu')), 1)
+    if task == 1:
+        env = KukaCamEnv1(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base1
+    elif task == 2:
+        env = KukaCamEnv2(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base2
+    else:
+        env = KukaCamEnv3(renders=render, image_output=not use_fast, mode=mode, width=128)
+        base = base3
+    success_count = 0
+    sum_L = 0
+    misbehavior_count = 0
+    print("*******************************************")
+    for n in range(n_episodes):
+        o, s = env.reset()
+        frame = 0
+        R = 0
+        while True:
+            if np.random.uniform(0, 1) < base_ratio:
+                o_next, s_next, r, done = env.step(base(s))
+            else:
+                if not use_fast:
+                    o_t = np_to_tensor(o, 1).unsqueeze(dim=0)
+                    s_t = np_to_tensor(s[:8], 1).unsqueeze(dim=0)
+                s = np_to_tensor(s, 1).unsqueeze(dim=0)
+                with torch.no_grad():
+                    if not use_fast:
+                        a = actor(o_t, s_t)
+                    else:
+                        a = actor(s)
+                a = a.cpu().squeeze().numpy()
+                o_next, s_next, r, done = env.step(a)
+            s = s_next
+            o = o_next
+            R += r
+            frame += 1
+            if frame == 1 or frame == 30 or done:
+                time.sleep(10)
+            if done or frame >= 100:
+                print('episode', n+1, 'ends in', frame, 'frames, return =', R)
+                if done:
+                    if R == 1:
+                        sum_L += frame
+                        success_count += 1
+                    else:
+                        misbehavior_count += 1
+                break
+    print('Average time in executing the task is', sum_L / success_count, ';\n'
+          'Success rate in', n_episodes, 'episodes is', success_count / n_episodes, ';\n'
+          'Misbehavior rate in', n_episodes, 'episodes is', misbehavior_count / n_episodes, ';\n')
+    print("*******************************************")
+    return sum_L / success_count, success_count / n_episodes, misbehavior_count / n_episodes
+
+
+def test_base2_ensemble(n_episodes=1000, render=False, add_noise=False):
+    env = KukaCamEnv2(renders=render, image_output=False)
+    success_count = 0
+    sum_L = 0
+    print("*******************************************")
+    for n in range(n_episodes):
+        o, s = env.reset()
+        frame = 0
+        R = 0
+        while True:
+            a = random.choice(base2_ensemble(s))
+            if add_noise:
+                a += 0.1 * np.random.normal(0, 1, 5)
+            o_next, s_next, r, done = env.step(a)
+            s = s_next
+            frame += 1
+            R += r
+            if done or frame >= 100:
+                print('episode', n+1, 'ends in', frame, 'frames, return =', R)
+                if done:
+                    sum_L += frame
+                    success_count += 1
+                break
+    print('Average time in executing the task is', sum_L / success_count, ';\n'
+          'Success rate in', n_episodes, 'episodes is', success_count / n_episodes, ';\n')
+    print("*******************************************")
+
+
+if __name__ == '__main__':
+    # test_critic(task=1, log=1, label='i', render=False, base_ratio=0.0, n_episodes=5, mode='de', use_fast=False)
+    al, sr, mr = test_actor(task=2, log=1, label='', render=True, base_ratio=0.0, n_episodes=100, mode='de', use_fast=True)
+    # test_base2_ensemble()
