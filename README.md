@@ -11,6 +11,7 @@ Guangming Wang, Minjian Xin, Wenhua Wu, Zhe Liu, and Hesheng Wang
 
 ## Prerequisites
 ------------------------------
+docker: https://hub.docker.com/layers/wenhua231/vsdrl/latest/images/sha256-d09a2e0e1f53417b6206a4a4142b37cbdbd769f59ed6ef462fae6f077f40e3ad?context=repo
 - Python 3.6.9
 - PyTorch 1.10.1
 - CUDA 10.2
