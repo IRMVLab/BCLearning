@@ -6,8 +6,8 @@ This is the official implementation of our TNNLS paper:
 
 Guangming Wang, Minjian Xin, Wenhua Wu, Zhe Liu, and Hesheng Wang
 
-[DDPGwB.pdf](https://github.com/IRMVLab/BCLearning/files/9906097/DDPGwB.pdf)
-[network.pdf](https://github.com/IRMVLab/BCLearning/files/9906101/network.pdf)
+![DDPGwb](https://user-images.githubusercontent.com/62023129/199145782-19b0d1ab-448e-4598-a185-6187b115ef0d.png)
+
 
 ## Prerequisites
 ------------------------------
