@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import time
-
+import argparse
 
 def test_critic(task, log, base_ratio=1.0, label='', render=False, n_episodes=1, mode='de', use_fast=True, mean=True):
     log_dir = 'saves/t' + str(task) + label + '/' + str(log)
@@ -61,7 +61,7 @@ def test_critic(task, log, base_ratio=1.0, label='', render=False, n_episodes=1,
 
 
 def test_actor(task, log, n_episodes=100, label='', base_ratio=1.0, render=False, mode='de', use_fast=True):
-    with open('saves/t' + str(task) + label + '/' + str(log) + '/actor.pt', 'rb') as fa:
+    with open('save_w/t' + str(task) + label + '/' + str(log) + '/actor_best.pt', 'rb') as fa:
         actor = opt_cuda(torch.load(fa, map_location=torch.device('cpu')), 1)
     if task == 1:
         env = KukaCamEnv1(renders=render, image_output=not use_fast, mode=mode, width=128)
@@ -99,10 +99,10 @@ def test_actor(task, log, n_episodes=100, label='', base_ratio=1.0, render=False
             o = o_next
             R += r
             frame += 1
-            if frame == 1 or frame == 30 or done:
-                time.sleep(10)
+            #if frame == 1 or frame == 30 or done:
+            #    time.sleep(10)
             if done or frame >= 100:
-                print('episode', n+1, 'ends in', frame, 'frames, return =', R)
+                #print('episode', n+1, 'ends in', frame, 'frames, return =', R)
                 if done:
                     if R == 1:
                         sum_L += frame
@@ -110,6 +110,7 @@ def test_actor(task, log, n_episodes=100, label='', base_ratio=1.0, render=False
                     else:
                         misbehavior_count += 1
                 break
+    print('saves/t', task, label,log)
     print('Average time in executing the task is', sum_L / success_count, ';\n'
           'Success rate in', n_episodes, 'episodes is', success_count / n_episodes, ';\n'
           'Misbehavior rate in', n_episodes, 'episodes is', misbehavior_count / n_episodes, ';\n')
@@ -117,17 +118,28 @@ def test_actor(task, log, n_episodes=100, label='', base_ratio=1.0, render=False
     return sum_L / success_count, success_count / n_episodes, misbehavior_count / n_episodes
 
 
-def test_base2_ensemble(n_episodes=1000, render=False, add_noise=False):
-    env = KukaCamEnv2(renders=render, image_output=False)
+def test_base(task = 1,n_episodes=1000, render=True, add_noise=False):
+    if task == 1:
+        env = KukaCamEnv1(renders=render,image_output = False)
+        base = base1
+    elif task == 2:
+        env = KukaCamEnv2(renders=render, image_output=False)
+        base = base2
+    elif task == 3:
+        env = KukaCamEnv3(renders=render, image_output=False)
+        base = base3
+
     success_count = 0
     sum_L = 0
+    misbehavior_count =0
     print("*******************************************")
     for n in range(n_episodes):
         o, s = env.reset()
         frame = 0
         R = 0
         while True:
-            a = random.choice(base2_ensemble(s))
+            print(s)
+            a = base(s)
             if add_noise:
                 a += 0.1 * np.random.normal(0, 1, 5)
             o_next, s_next, r, done = env.step(a)
@@ -137,15 +149,31 @@ def test_base2_ensemble(n_episodes=1000, render=False, add_noise=False):
             if done or frame >= 100:
                 print('episode', n+1, 'ends in', frame, 'frames, return =', R)
                 if done:
-                    sum_L += frame
-                    success_count += 1
+                    if R == 1:
+                        sum_L += frame
+                        success_count += 1
+                    else:
+                        misbehavior_count += 1
                 break
+
     print('Average time in executing the task is', sum_L / success_count, ';\n'
-          'Success rate in', n_episodes, 'episodes is', success_count / n_episodes, ';\n')
+                                                                          'Success rate in', n_episodes,
+          'episodes is', success_count / n_episodes, ';\n'
+                                                     'Misbehavior rate in', n_episodes, 'episodes is',
+          misbehavior_count / n_episodes, ';\n')
     print("*******************************************")
+            #return sum_L / success_count, success_count / n_episodes, misbehavior_count / n_episodes
+
+
 
 
 if __name__ == '__main__':
-    # test_critic(task=1, log=1, label='i', render=False, base_ratio=0.0, n_episodes=5, mode='de', use_fast=False)
-    al, sr, mr = test_actor(task=2, log=1, label='', render=True, base_ratio=0.0, n_episodes=100, mode='de', use_fast=True)
-    # test_base2_ensemble()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-g', '--gpu', type=int, default=0)
+    parser.add_argument('-l', '--log', type=int, default=1)
+    parser.add_argument('-a', '--imitate', action='store_true')
+    parser.add_argument('-t', '--task', type=int, default=1)
+    parser.add_argument('-q', '--mixed_q', action='store_true')
+    parser.add_argument('-b', '--label', type=str, default='')
+    args = parser.parse_args()
+    test_actor(task=args.task, log=args.log, label=args.label, render=True, base_ratio=0.0, n_episodes=1000, mode='de',use_fast=True)

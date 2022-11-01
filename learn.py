@@ -47,6 +47,9 @@ def train(env, agent, log_dir):
         writer.writerow(['episode', 'frames', 'return', 'Lc', 'La', 'Lbc', 'ratio', 'test'])
     n_episodes = 30000
     frames = 0
+    test = 0
+    test_old = 0
+    average_frame = 0
     termi = 100
     if agent.ensemble:
         max_frames = 1e6
@@ -95,20 +98,34 @@ def train(env, agent, log_dir):
                         progress.update(task, advance=advance)
                         progress.refresh()
                         progress_frames += advance
-                    R_t = 0
-                    if agent.use_fast:
-                        o, s = env.reset()
-                        frame_t = 0
-                        while True:
-                            a, _ = agent.act(o, s, test=True)
-                            o_next, s_next, r, done = env.step(a)
-                            o = o_next
-                            s = s_next
-                            frame_t += 1
-                            R_t += r
-                            if done or frame_t == termi:
-                                break
-                    new_line = np.array([n + 1, frames, R, av_Lc, av_La, av_Lbc, ratio / frame, R_t])
+
+                    # if frames <= 6e5:
+                    #     for p in agent.optimizer_actor.param_groups:
+                    #         p['lr'] = 1e-3 * (1 - 0.9 * frames / 6e5)
+                    # else:
+                    #     p['lr'] = 1e-4
+
+                    if (n+1) % 30 == 0:
+                        success_count = 0
+                        average_frames = 0
+                        for _ in range(100):
+                            o, s = env.reset()
+                            frame_t = 0
+                            R_t = 0
+                            while True:
+                                a, _ = agent.act(o, s, test=True)
+                                o_next, s_next, r, done = env.step(a)
+                                o = o_next
+                                s = s_next
+                                frame_t += 1
+                                R_t += r
+                                if done or frame_t == termi:
+                                    if R_t == 1:
+                                        success_count += 1
+                                        average_frames += frame_t
+                                    break
+                        test = success_count / 100
+                    new_line = np.array([n + 1, frames, R, av_Lc, av_La, av_Lbc, ratio / frame, test])
                     with open(log_file, "a+", newline='') as csvfile:
                         writer = csv.writer(csvfile)
                         writer.writerow(new_line)
@@ -116,6 +133,10 @@ def train(env, agent, log_dir):
                         torch.save(agent.critic, fc)
                     with open(log_dir + '/actor.pt', 'wb') as fa:
                         torch.save(agent.actor, fa)
+                    if test > test_old:
+                        with open(log_dir + '/actor_best.pt', 'wb') as fb:
+                            torch.save(agent.actor, fb)
+                        test_old = test
                     break
 
 

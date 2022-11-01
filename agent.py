@@ -17,8 +17,7 @@ def da(angle, orn):
     return np.tanh(2 * (angle - orn))
 
 
-
-def base_template(s, z1, z2, z3, K=5):
+def base_template(s, z1, z2, z3, K = 5):
     x_n = s[0]
     y_n = s[1]
     height = s[2]
@@ -31,79 +30,106 @@ def base_template(s, z1, z2, z3, K=5):
     orn2 = s[17:20]
     action = np.zeros(5)
     if finger_force < 1:
-        action[0] = np.tanh(xdist(pos1, orn1, x_n) * K)
-        action[1] = np.tanh(ydist(pos1, orn1, y_n) * K)
+        action[0] = np.tanh(xdist(pos1, orn1, x_n-0.02) * K)
+        action[1] = np.tanh(ydist(pos1, orn1, y_n+0.01) * K)
         action[2] = np.tanh(K * (pos1[2] + z1 - height))
         action[3] = da(gripper_angle, orn1[2])
-        action[4] = da(0, finger_angle)
-        if pos1[2] + z1 < height < z2:
-            action[4] = da(0.2, finger_angle)
+        #action[4] = da(0, finger_angle)
+        if height < pos1[2] + z1:
+            action[4] = da(0, finger_angle)
     else:
         action[0] = np.tanh((pos2[0] - pos1[0]) * K)
         action[1] = np.tanh((pos2[1] - pos1[1]) * K)
         action[2] = np.tanh(K * (z3 - pos1[2]))
         action[3] = da(gripper_angle, orn2[2])
         action[4] = da(0, finger_angle)
+
         if np.sqrt((pos2[0] - pos1[0]) ** 2 + (pos2[1] - pos1[1]) ** 2) < 0.02:
-            action[4] = da(0.2, finger_angle)
+            action[2] = np.tanh(5 * (0.15 - pos1[2]))
+            if pos1[2] < 0.2:
+                action[4] = da(0.2, finger_angle)
     return action
 
-
 def base1(s):
-    return base_template(s, z1=0.25, z2=0.35, z3=0.25)
-
+    return base_template(s, z1=0.24, z2=0.35, z3=0.25)
 
 def base2(s):
-    return base_template(s, z1=0.25, z2=0.35, z3=0.1)
-
-
-def base2_ensemble(s):
-    x_n = s[0]
-    y_n = s[1]
-    height = s[2]
-    gripper_angle = s[5]
-    finger_angle = s[6]
-    finger_force = s[7]
-    block_pos = s[8:11]
-    block_orn = s[11:14]
-    block2_pos = s[14:17]
-    block2_orn = s[17:20]
-
-    def reach():
-        action = np.zeros(5)
-        K = 10
-        if finger_force < 1:
-            action[0] = np.tanh(xdist(block_pos, block_orn, x_n) * K)
-            action[1] = np.tanh(ydist(block_pos, block_orn, y_n) * K)
-            action[2] = np.tanh(K * (block_pos[2] + 0.22 - height))
-            action[3] = da(gripper_angle, block_orn[2])
-        else:
-            action[0] = np.tanh((block2_pos[0] - block_pos[0]) * K)
-            action[1] = np.tanh((block2_pos[1] - block_pos[1]) * K)
-            action[2] = np.tanh(K * (0.1 - block_pos[2]))
-            action[3] = da(gripper_angle, block2_orn[2])
-        return action
-
-    def grasp():
-        action = np.zeros(5)
-        if finger_force < 1:
-            action[4] = da(0, finger_angle)
-            if block_pos[2] + 0.25 < height < 0.35:
-                action[4] = da(0.2, finger_angle)
-        return action
-
-    def drop():
-        action = np.zeros(5)
-        if finger_force >= 1:
-            action[4] = da(0, finger_angle)
-            if np.sqrt((block2_pos[0] - block_pos[0]) ** 2 + (block2_pos[1] - block_pos[1]) ** 2) < 0.02:
-                action[4] = da(0.2, finger_angle)
-        return action
-    return reach(), grasp(), drop()
-
+    return base_template(s, z1=0.24, z2=0.35, z3=0.1)
 
 def base3(s):
-    return base_template(s, z1=0.3, z2=0.45, z3=0.35)
+    return base_template(s, z1=0.28, z2=0.45, z3=0.35)
+
+def base3_ensemble(info):
+    x_n = info[0]
+    y_n = info[1]
+    height = info[2]
+    gripper_angle = info[5]
+    finger_angle = info[6]
+    finger_force = info[7]
+    cups_pos = info[8:11]
+    cups_orn = info[11:14]
+    cup_pos = info[14:17]
+    cup_orn = info[17:20]
+    def b0():
+        action = np.zeros(5)
+        if finger_force < 1:
+            action[0] = np.tanh(xdist(cups_pos, cups_orn, x_n) * 5)
+            action[1] = np.tanh(ydist(cups_pos, cups_orn, y_n) * 5)
+            action[2] = np.tanh(5 * (cups_pos[2] + 0.3 - height))
+            action[3] = da(gripper_angle, cups_orn[2])
+            action[4] = da(0, finger_angle)
+            if cups_pos[2] + 0.3 < height < 0.45:
+                action[4] = da(0.2, finger_angle)
+        else:
+            action[0] = np.tanh((cup_pos[0] - cups_pos[0]) * 5)
+            action[1] = np.tanh((cup_pos[1] - cups_pos[1]) * 5)
+            action[2] = np.tanh(5 * (0.35 - cups_pos[2]))
+            action[3] = da(gripper_angle, cup_orn[2])
+            action[4] = da(0, finger_angle)
+            if np.sqrt((cup_pos[0] - cups_pos[0]) ** 2 + (cup_pos[1] - cups_pos[1]) ** 2) < 0.02:
+                action[4] = da(0.2, finger_angle)
+        return action
+
+
+    def b1():
+        action = np.zeros(5)
+        if finger_force < 1:
+            if xdist(cups_pos, cups_orn, x_n) < 0.05 and ydist(cups_pos, cups_orn, y_n) < 0.05:
+                action[0] = np.tanh(xdist(cups_pos, cups_orn, x_n) * 5)
+                action[1] = np.tanh(ydist(cups_pos, cups_orn, y_n) * 5)
+                action[2] = np.tanh(5 * (cups_pos[2] + 0.3 - height))
+                action[3] = da(gripper_angle, cups_orn[2])
+                action[4] = da(0, finger_angle)
+                if cups_pos[2] + 0.3 < height < 0.45:
+                    action[4] = da(0.2, finger_angle)
+            else:
+                action[0] = np.tanh(xdist(cups_pos, cups_orn, x_n) * 5)
+                action[1] = np.tanh(ydist(cups_pos, cups_orn, y_n) * 5)
+                action[2] = 0
+                action[3] = da(gripper_angle, cups_orn[2])
+                action[4] = da(0, finger_angle)
+                if cups_pos[2] + 0.3 < height < 0.45:
+                    action[4] = da(0.2, finger_angle)
+        else:
+            if np.sqrt((cup_pos[0] - cups_pos[0]) ** 2 + (cup_pos[1] - cups_pos[1]) ** 2) > 0.05 and cups_pos[2] < 0.25:
+                action[0] = 0
+                action[1] = 0
+                action[2] = np.tanh(5 * (0.35 - cups_pos[2]))
+                action[3] = da(gripper_angle, cup_orn[2])
+                action[4] = da(0, finger_angle)
+
+            else:
+                action[0] = np.tanh((cup_pos[0] - cups_pos[0]) * 5)
+                action[1] = np.tanh((cup_pos[1] - cups_pos[1]) * 5)
+                action[2] = np.tanh(5 * (0.35 - cups_pos[2]))
+                action[3] = da(gripper_angle, cup_orn[2])
+                action[4] = da(0, finger_angle)
+            if np.sqrt((cup_pos[0] - cups_pos[0]) ** 2 + (cup_pos[1] - cups_pos[1]) ** 2) < 0.02:
+                action[2] = np.tanh(5 * (0.15 - cups_pos[2]))
+                if cups_pos[2] < 0.2:
+                    action[4] = da(0.2, finger_angle)
+        return action
+    return b0(),b1()
 
 
 def base_controller(s, base):
@@ -306,9 +332,9 @@ class WBAgent:
         if self.task == 1:
             self.base = base1
         elif self.task == 2:
-            self.base = base2_ensemble if self.ensemble else base2
+            self.base = base2
         elif self.task == 3:
-            self.base = base3
+            self.base = base3_ensemble if self.ensemble else base3
         if self.use_fast:
             self.buffer = ReplayBufferFast(20, 5, size=1000000)
         else:
@@ -378,6 +404,8 @@ class WBAgent:
                     return action_b, False
                 else:
                     return action.squeeze().cpu().numpy(), True
+
+
 
     def remember(self, observation, state, action, next_observation, next_state, reward, done):
         if self.use_fast:
@@ -500,3 +528,5 @@ class WBAgent:
                 total_La += La.item()
 
         return total_Lc / steps, total_La / steps, total_Lbc / steps
+
+
