@@ -19,7 +19,7 @@ Guangming Wang, Minjian Xin, Wenhua Wu, Zhe Liu, and Hesheng Wang
 ## Usage
 ----------------------
 ### Train
-Train the complete algorithm with state-input. $-t$ is the training task. $-l$ is the saving log
+Train the complete algorithm with state-input. `-t` is the training task. `-l` is the saving log.
 ```
 python learn.py -q -b -c -t 1 -l 1
 ```
@@ -33,7 +33,7 @@ python learn.py -q -b -c -e
 ```
 
 ### test
-Test the model in log $-l$ of task $-t$.
+Test the model in log `-l` of task `-t`.
 ```
 python test.py -t 1 -l 1 
 ```
