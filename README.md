@@ -47,7 +47,7 @@ python plot.py
 ## Citation
 --------------------------------
 If you find our work useful in your research, please cite:
-
+```
 @article{wang2022learning,
   title={Learning of Long-Horizon Sparse-Reward Robotic Manipulator Tasks With Base Controllers},
   author={Wang, Guangming and Xin, Minjian and Wu, Wenhua and Liu, Zhe and Wang, Hesheng},
@@ -55,3 +55,4 @@ If you find our work useful in your research, please cite:
   year={2022},
   publisher={IEEE}
 }
+```
